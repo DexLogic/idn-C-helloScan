@@ -46,14 +46,14 @@
 
 typedef unsigned long in_addr_t;
 
-typedef void(*IFADDR_CALLBACK_PFN)(const char *ifName, uint32_t ifIP4Addr);
+typedef void(*IFADDR_CALLBACK_PFN)(void *callbackArg, const char *ifName, uint32_t ifIP4Addr);
 
 
 // -------------------------------------------------------------------------------------------------
 //  Inline functions
 // -------------------------------------------------------------------------------------------------
 
-inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback)
+inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback, void *callbackArg)
 {
     extern void logError(const char *fmt, ...);
 
@@ -64,11 +64,7 @@ inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback)
     hints.ai_family = AF_INET;              // IPv4
 
     int rcAddrInfo = getaddrinfo("", "", &hints, &servinfo);
-    if(rcAddrInfo != 0) 
-    {
-        logError("getaddrinfo() failed (error: %s)", gai_strerror(rcAddrInfo));
-        return -1;
-    }
+    if(rcAddrInfo != 0) return rcAddrInfo;
 
     // Walk through all interfaces (servinfo points to a linked list of struct addrinfos)
     for(struct addrinfo *ifa = servinfo; ifa != NULL; ifa = ifa->ai_next)
@@ -78,7 +74,7 @@ inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback)
 
         // Invoke callback on interface
         struct sockaddr_in *ifSockAddr = (struct sockaddr_in *)ifa->ai_addr;
-        pfnCallback(ifa->ai_canonname, (uint32_t)(ifSockAddr->sin_addr.s_addr));
+        pfnCallback(callbackArg, ifa->ai_canonname, (uint32_t)(ifSockAddr->sin_addr.s_addr));
     }
 
     // Interface list is dynamically allocated and must be freed

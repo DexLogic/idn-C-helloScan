@@ -35,9 +35,9 @@
 // Standard libraries
 #include <unistd.h>
 #include <errno.h>
-#include <time.h>
 
 // Platform headers
+#include <ifaddrs.h>
 #include <arpa/inet.h>
 
 
@@ -45,24 +45,18 @@
 //  Typedefs
 // -------------------------------------------------------------------------------------------------
 
-typedef void (* IFADDR_CALLBACK_PFN)(const char *ifName, uint32_t ifIP4Addr);
+typedef void (* IFADDR_CALLBACK_PFN)(void *callbackArg, const char *ifName, uint32_t ifIP4Addr);
 
 
 // -------------------------------------------------------------------------------------------------
 //  Inline functions
 // -------------------------------------------------------------------------------------------------
 
-inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback)
+inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback, void *callbackArg)
 {
-    extern void logError(const char *fmt, ...);
-
     // Find all interfaces
     struct ifaddrs *ifaddr;
-    if(getifaddrs(&ifaddr) == -1) 
-    {
-        logError("getifaddrs() failed (error = %d)", errno);
-        return -1;
-    }
+    if(getifaddrs(&ifaddr) == -1) return errno;
 
     // Walk through all interfaces
     for(struct ifaddrs *ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) 
@@ -72,7 +66,7 @@ inline static int plt_ifAddrListVisitor(IFADDR_CALLBACK_PFN pfnCallback)
 
         // Invoke callback on interface
         struct sockaddr_in *ifSockAddr = (struct sockaddr_in *)ifa->ifa_addr;
-        pfnCallback(ifa->ifa_name, (uint32_t)(ifSockAddr->sin_addr.s_addr));
+        pfnCallback(callbackArg, ifa->ifa_name, (uint32_t)(ifSockAddr->sin_addr.s_addr));
     }
 
     // Interface list is dynamically allocated and must be freed

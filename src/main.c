@@ -142,7 +142,7 @@ void logInfo(const char *fmt, ...)
 //  IDN-Hello server scan
 // -------------------------------------------------------------------------------------------------
 
-void idnHelloScan(const char *ifName, uint32_t ifIP4Addr)
+void idnHelloScan(void *callbackArg, const char *ifName, uint32_t ifIP4Addr)
 {
     // Socket file descriptor
     int fdSocket = -1;
@@ -333,7 +333,7 @@ int main(int argc, char **argv)
         }
 
         // Walk through all interfaces and find IDN-Hello servers
-        if(plt_ifAddrListVisitor(idnHelloScan)) break;
+        if(plt_ifAddrListVisitor(idnHelloScan, (void *)0)) break;
     }
     while (0);
 

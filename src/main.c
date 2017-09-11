@@ -214,12 +214,24 @@ void idnHelloScan(void *callbackArg, const char *ifName, uint32_t ifIP4Addr)
         FD_SET(fdSocket, &rfdsPrm);
 
         unsigned msTimeout = 500;
-        struct timeval tv;
-        tv.tv_sec = msTimeout / 1000;
-        tv.tv_usec = (msTimeout % 1000) * 1000;
+
+        // Remember start time
+        uint32_t usStart = plt_getMonoTimeUS();
 
         while(1)
         {
+            // Calculate time left
+            uint32_t usNow = plt_getMonoTimeUS();
+            uint32_t usElapsed = usNow - usStart;
+            uint32_t usLeft = (msTimeout * 1000) - usElapsed;
+            if((int32_t)usLeft <= 0) break;
+
+            // Populate select timeout
+            struct timeval tv;
+            tv.tv_sec = usLeft / 1000000;
+            tv.tv_usec = usLeft % 1000000;
+
+            // Wait for incoming datagrams
             fd_set rfdsResult = rfdsPrm;
             int numReady = select(fdSocket + 1, &rfdsResult, 0, 0, &tv);
             if(numReady < 0)
@@ -244,6 +256,7 @@ void idnHelloScan(void *callbackArg, const char *ifName, uint32_t ifIP4Addr)
                 break;
             }
 
+            // Convert IP address to string
             char recvAddrString[20];
             if(inet_ntop(AF_INET, &recvSockAddr.sin_addr, recvAddrString, sizeof(recvAddrString)) == (char *)0)
             {
@@ -251,6 +264,14 @@ void idnHelloScan(void *callbackArg, const char *ifName, uint32_t ifIP4Addr)
                 break;
             }
             
+            // Check sender port
+            if(ntohs(recvSockAddr.sin_port) != IDNVAL_HELLO_UDP_PORT)
+            {
+                logError("%s: Invalid sender port %u", recvAddrString, ntohs(recvSockAddr.sin_port));
+                break;
+            }
+
+            // Check packet size
             if(nBytes != (sizeof(IDNHDR_PACKET) + sizeof(IDNHDR_SCAN_RESPONSE)))
             {
                 logError("%s: Invalid packet size %u\n", recvAddrString, nBytes);
@@ -324,6 +345,13 @@ int main(int argc, char **argv)
 
     do
     {
+        // Validate monotonic time reference
+        if(plt_validateMonoTime() != 0)
+        {
+            logError("Monotonic time init failed");
+            return -1;
+        }
+
         // Initialize platform sockets
         int rcStartup = plt_sockStartup();
         if(rcStartup)
